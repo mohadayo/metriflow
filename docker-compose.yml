@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  collector:
+    build:
+      context: ./services/collector
+    ports:
+      - "${COLLECTOR_PORT:-8081}:8081"
+    environment:
+      - COLLECTOR_PORT=8081
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  analyzer:
+    build:
+      context: ./services/analyzer
+    ports:
+      - "${ANALYZER_PORT:-8082}:8082"
+    environment:
+      - ANALYZER_PORT=8082
+      - COLLECTOR_URL=http://collector:8081
+    depends_on:
+      collector:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  gateway:
+    build:
+      context: ./services/gateway
+    ports:
+      - "${GATEWAY_PORT:-8083}:8083"
+    environment:
+      - GATEWAY_PORT=8083
+      - COLLECTOR_URL=http://collector:8081
+      - ANALYZER_URL=http://analyzer:8082
+    depends_on:
+      collector:
+        condition: service_healthy
+      analyzer:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
